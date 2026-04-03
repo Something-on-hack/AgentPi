@@ -1,2 +1,4 @@
 .vscode/
 Python/.venv/
+.venv/
+.idea/
