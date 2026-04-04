@@ -1,10 +1,8 @@
-import sys
 import os
+from datetime import time
 
+import time
 import paramiko
-from paramiko import agent
-
-
 
 class Agent(object):
     def __init__(self, ip):
@@ -30,10 +28,9 @@ class Agent(object):
         self.ssh_client.connect(
             hostname=self.ip,
             username="vovan",
-            # key_filename=self.get_public_key_path(),
             pkey=key,
             port=2222,
-            timeout=10
+            timeout=60
         )
         print("Successfully connected to %s" % self.ip)
 
@@ -57,9 +54,12 @@ class Agent(object):
             raise Exception("SSH connection not established")
 
         # Запрашиваем интерактивную оболочку
-        channel = self.ssh_client.invoke_shell()
+        channel = self.ssh_client.get_transport().open_session()
+        # channel.settimeout(None)
+        channel.get_pty()
+        channel.invoke_shell()
+
         # Ждём приглашение (или просто небольшую паузу для инициализации)
-        import time
         time.sleep(0.5)
 
         # Очищаем буфер (приветственное сообщение сервера)
@@ -67,7 +67,7 @@ class Agent(object):
             channel.recv(65535)
 
         # Отправляем команду + перевод строки
-        channel.send(command + "\n")
+        channel.send(command)
 
         # Ждём выполнения и собираем вывод
         output = ""
