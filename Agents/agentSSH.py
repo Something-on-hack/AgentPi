@@ -5,6 +5,8 @@ import subprocess
 import base64
 import os
 
+
+KEYS_DIR = 'keys'
 # --- КОНФИГУРАЦИЯ ДЛЯ ФЕРМЫ СЕРВЕРОВ ---
 # 1. Приватный ключ ЭТОГО сервера (Host Key - нужен для работы протокола SSH)
 SERVER_HOST_KEY_FILE = os.path.join('keys', 'server_host_rsa')
@@ -57,6 +59,26 @@ class FleetSSHServer(paramiko.ServerInterface):
         print("[+] PTY request accepted")
         return True
 
+
+def ensure_keys():
+    if not os.path.exists(KEYS_DIR):
+        print("[!] Папка 'keys' не найдена. Создаю..")
+
+        os.makedirs(KEYS_DIR)
+
+    if not os.path.exists(SERVER_HOST_KEY_FILE):
+        print("[!] Генерация host key (RSA 4096)...")
+        host_key = paramiko.RSAKey.generate(4096)
+
+        host_key.write_private_key_file(SERVER_HOST_KEY_FILE)
+        print(f"[+] Host key сохранён: {SERVER_HOST_KEY_FILE}")
+
+    try:
+        with open("admin_public_key.pub", "x") as f:
+            print("Add the public key to the admin_public_key.pub")
+            pass
+    except FileExistsError:
+        print("Check the correctness of the public key")
 
 def load_admin_public_key(filepath):
     """Считывает открытый ключ админа из файла"""
