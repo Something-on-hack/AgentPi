@@ -2,6 +2,7 @@
 Python/.venv/
 .venv/
 .idea/
+Agents/keys/*
 *__pycache__/
 Python/keys/private/*
 Python/keys/public/*
