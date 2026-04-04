@@ -24,16 +24,11 @@
       select[multiple] {
         min-height: 120px;
       }
-      .list-group-item {
-        cursor: pointer;
-      }
       #agentSelect,
       #scriptSelect {
         height: 111px;
         padding-top: 15px;
         padding-bottom: 15px;
-        line-height: 1.5;
-        /* опционально: увеличить шрифт */
         font-size: 1rem;
       }
     </style>
@@ -117,9 +112,7 @@
                 class="form-select"
                 id="selectedAgentsList"
                 size="4"
-              >
-                <option disabled>-- здесь будут выбранные агенты --</option>
-              </select>
+              ></select>
               <button
                 class="btn btn-sm btn-outline-danger mt-2"
                 id="clearSelectedAgentsBtn"
@@ -143,9 +136,7 @@
                 class="form-select"
                 id="selectedScriptsList"
                 size="4"
-              >
-                <option disabled>-- здесь будут выбранные сценарии --</option>
-              </select>
+              ></select>
               <button
                 class="btn btn-sm btn-outline-danger mt-2"
                 id="clearSelectedScriptsBtn"
@@ -158,7 +149,13 @@
       </div>
     </div>
 
-    <!-- Модальное окно для добавления агента (4 поля) -->
+    <div class="container-fluid mt-4 px-0">
+      <button id="runButton" class="btn btn-success w-100 py-3 fw-bold fs-4">
+        🚀 ЗАПУСК
+      </button>
+    </div>
+
+    <!-- Модальное окно для добавления агента -->
     <div class="modal fade" id="agentModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -224,7 +221,7 @@
       </div>
     </div>
 
-    <!-- Модальное окно для добавления сценария (пока одно поле) -->
+    <!-- Модальное окно для добавления сценария -->
     <div class="modal fade" id="scriptModal" tabindex="-1">
       <div class="modal-dialog">
         <div class="modal-content">
@@ -262,147 +259,121 @@
         </div>
       </div>
     </div>
-    <div class="container-fluid mt-4 px-0">
-      <button id="runButton" class="btn btn-success w-100 py-3 fw-bold fs-4">
-        🚀 ЗАПУСК
-      </button>
-    </div>
 
     <script>
       // ==================== ЭЛЕМЕНТЫ DOM ====================
-      // Исходные списки
       const agentSelect = document.getElementById("agentSelect");
       const scriptSelect = document.getElementById("scriptSelect");
-      // Выбранные списки (мультиселекты)
       const selectedAgentsList = document.getElementById("selectedAgentsList");
       const selectedScriptsList = document.getElementById(
         "selectedScriptsList",
       );
-      // Кнопки добавления
       const addAgentBtn = document.getElementById("addAgentBtn");
       const addScriptBtn = document.getElementById("addScriptBtn");
-      // Кнопки очистки
       const clearSelectedAgentsBtn = document.getElementById(
         "clearSelectedAgentsBtn",
       );
       const clearSelectedScriptsBtn = document.getElementById(
         "clearSelectedScriptsBtn",
       );
-      // Модалки
       const agentModal = new bootstrap.Modal(
         document.getElementById("agentModal"),
       );
       const scriptModal = new bootstrap.Modal(
         document.getElementById("scriptModal"),
       );
-      // Поля модалки агента
       const agentIp = document.getElementById("agentIp");
       const agentHostname = document.getElementById("agentHostname");
       const agentKey = document.getElementById("agentKey");
       const agentComment = document.getElementById("agentComment");
-      // Поле модалки сценария
       const scriptNameInput = document.getElementById("scriptNameInput");
-      // Кнопки подтверждения
       const confirmAgentBtn = document.getElementById("confirmAgentBtn");
       const confirmScriptBtn = document.getElementById("confirmScriptBtn");
+      const runButton = document.getElementById("runButton");
 
       // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
-      // Добавление агента в список выбранных (если ещё нет)
       function addAgentToSelected(agentId, agentDisplayName, ip, key, comment) {
-        // Проверяем, есть ли уже такой агент в selectedAgentsList по value (agentId)
-        let exists = false;
         for (let i = 0; i < selectedAgentsList.options.length; i++) {
           if (selectedAgentsList.options[i].value === agentId) {
-            exists = true;
-            break;
+            alert(`Агент "${agentDisplayName}" уже в рабочем списке`);
+            return;
           }
         }
-        if (!exists) {
-          const option = document.createElement("option");
-          option.value = agentId;
-          option.textContent = agentDisplayName;
-          // Сохраним дополнительные данные для будущего использования
-          option.dataset.ip = ip;
-          option.dataset.key = key;
-          option.dataset.comment = comment;
-          selectedAgentsList.appendChild(option);
-        } else {
-          alert(`Агент "${agentDisplayName}" уже в рабочем списке`);
-        }
+        const option = document.createElement("option");
+        option.value = agentId;
+        option.textContent = agentDisplayName;
+        option.dataset.ip = ip;
+        option.dataset.key = key;
+        option.dataset.comment = comment;
+        selectedAgentsList.appendChild(option);
+        removePlaceholder(selectedAgentsList);
       }
 
-      // Добавление сценария в список выбранных
       function addScriptToSelected(scriptName) {
-        let exists = false;
         for (let i = 0; i < selectedScriptsList.options.length; i++) {
           if (selectedScriptsList.options[i].textContent === scriptName) {
-            exists = true;
-            break;
+            alert(`Сценарий "${scriptName}" уже в рабочем списке`);
+            return;
           }
         }
-        if (!exists) {
-          const option = document.createElement("option");
-          option.textContent = scriptName;
-          option.value = scriptName;
-          selectedScriptsList.appendChild(option);
-        } else {
-          alert(`Сценарий "${scriptName}" уже в рабочем списке`);
+        const option = document.createElement("option");
+        option.textContent = scriptName;
+        option.value = scriptName;
+        selectedScriptsList.appendChild(option);
+        removePlaceholder(selectedScriptsList);
+      }
+
+      function removePlaceholder(selectEl) {
+        if (selectEl.options.length === 1 && selectEl.options[0].disabled) {
+          selectEl.remove(0);
         }
       }
 
-      // Очистка списка выбранных агентов
+      function addPlaceholderIfEmpty(selectEl, text) {
+        if (selectEl.options.length === 0) {
+          const placeholder = document.createElement("option");
+          placeholder.disabled = true;
+          placeholder.textContent = text;
+          selectEl.appendChild(placeholder);
+        }
+      }
+
       function clearSelectedAgents() {
         while (selectedAgentsList.options.length > 0) {
           selectedAgentsList.remove(0);
         }
-        // Добавим заглушку-подсказку
-        const placeholder = document.createElement("option");
-        placeholder.disabled = true;
-        placeholder.textContent = "-- список пуст --";
-        selectedAgentsList.appendChild(placeholder);
+        addPlaceholderIfEmpty(selectedAgentsList, "-- список пуст --");
       }
 
-      // Очистка списка выбранных сценариев
       function clearSelectedScripts() {
         while (selectedScriptsList.options.length > 0) {
           selectedScriptsList.remove(0);
         }
-        const placeholder = document.createElement("option");
-        placeholder.disabled = true;
-        placeholder.textContent = "-- список пуст --";
-        selectedScriptsList.appendChild(placeholder);
+        addPlaceholderIfEmpty(selectedScriptsList, "-- список пуст --");
       }
 
       // ==================== СОБЫТИЯ ====================
-      // 1. При выборе агента из исходного списка — добавляем в выбранные
       agentSelect.addEventListener("change", (e) => {
         const selectedOption = agentSelect.options[agentSelect.selectedIndex];
         if (!selectedOption.value || selectedOption.disabled) return;
-
         const agentId = selectedOption.value;
         const agentDisplayName = selectedOption.textContent;
         const ip = selectedOption.dataset.ip || "";
         const key = selectedOption.dataset.key || "";
         const comment = selectedOption.dataset.comment || "";
-
         addAgentToSelected(agentId, agentDisplayName, ip, key, comment);
-        // Сбрасываем выбор в исходном списке обратно на заглушку
         agentSelect.selectedIndex = 0;
       });
 
-      // 2. При выборе сценария из исходного списка — добавляем в выбранные
       scriptSelect.addEventListener("change", (e) => {
         const selectedOption = scriptSelect.options[scriptSelect.selectedIndex];
         if (!selectedOption.value || selectedOption.disabled) return;
-
         const scriptName = selectedOption.textContent;
         addScriptToSelected(scriptName);
         scriptSelect.selectedIndex = 0;
       });
 
-      // 3. Открытие модалок при клике на "+"
       addAgentBtn.addEventListener("click", () => {
-        // Очищаем поля
         agentIp.value = "";
         agentHostname.value = "";
         agentKey.value = "";
@@ -415,49 +386,33 @@
         scriptModal.show();
       });
 
-      // 4. Добавление нового агента через модальное окно (4 поля)
       confirmAgentBtn.addEventListener("click", () => {
         const ip = agentIp.value.trim();
         const hostname = agentHostname.value.trim();
         const key = agentKey.value.trim();
         const comment = agentComment.value.trim();
-
         if (!ip || !hostname || !key) {
-          alert(
-            "Пожалуйста, заполните IP, Hostname и Key (комментарий необязателен)",
-          );
+          alert("Пожалуйста, заполните IP, Hostname и Key");
           return;
         }
-
-        // Генерируем уникальный ID для агента (можно по времени)
         const agentId =
           "agent_" + Date.now() + "_" + Math.floor(Math.random() * 10000);
-
-        // Создаём новый option в исходном списке агентов
         const newOption = document.createElement("option");
         newOption.value = agentId;
-        newOption.textContent = hostname; // в списке отображаем hostname
+        newOption.textContent = hostname;
         newOption.dataset.ip = ip;
         newOption.dataset.key = key;
         newOption.dataset.comment = comment;
         agentSelect.appendChild(newOption);
-
-        // Очищаем поля и закрываем модалку
         agentIp.value = "";
         agentHostname.value = "";
         agentKey.value = "";
         agentComment.value = "";
         agentModal.hide();
-
-        // Автоматически выбираем нового агента в исходном списке (не обязательно, но можно)
-        newOption.selected = true;
-        // И сразу добавляем его в выбранные (по желанию пользователя, но логично: новый агент сразу нужен)
         addAgentToSelected(agentId, hostname, ip, key, comment);
-        // Сбрасываем выбор исходного списка
         agentSelect.selectedIndex = 0;
       });
 
-      // 5. Добавление нового сценария
       confirmScriptBtn.addEventListener("click", () => {
         const newName = scriptNameInput.value.trim();
         if (newName === "") {
@@ -470,77 +425,53 @@
         scriptSelect.appendChild(newOption);
         scriptNameInput.value = "";
         scriptModal.hide();
-        // Можно автоматически добавить в выбранные
         addScriptToSelected(newName);
         scriptSelect.selectedIndex = 0;
       });
 
-      // 6. Очистка выбранных списков
       clearSelectedAgentsBtn.addEventListener("click", clearSelectedAgents);
       clearSelectedScriptsBtn.addEventListener("click", clearSelectedScripts);
 
-      // Инициализация: убираем заглушки в выбранных списках, если есть реальные элементы
-      function initSelectedLists() {
-        if (
-          selectedAgentsList.options.length === 0 ||
-          (selectedAgentsList.options.length === 1 &&
-            selectedAgentsList.options[0].disabled)
-        ) {
-          clearSelectedAgents(); // создаст заглушку
-        }
-        if (
-          selectedScriptsList.options.length === 0 ||
-          (selectedScriptsList.options.length === 1 &&
-            selectedScriptsList.options[0].disabled)
-        ) {
-          clearSelectedScripts();
-        }
-      }
-      initSelectedLists();
-
-      // Найти кнопку запуска (она уже есть в HTML)
-      const runButton = document.getElementById("runButton");
-      if (runButton) {
-        runButton.addEventListener("click", () => {
-          const selectedAgents = [];
-          const selectedAgentsList =
-            document.getElementById("selectedAgentsList");
-          for (let i = 0; i < selectedAgentsList.options.length; i++) {
-            const opt = selectedAgentsList.options[i];
-            if (opt.disabled) continue;
-            selectedAgents.push({
-              id: opt.value,
-              name: opt.textContent,
-              ip: opt.dataset.ip || "",
-              key: opt.dataset.key || "",
-              comment: opt.dataset.comment || "",
-            });
-          }
-          if (selectedAgents.length === 0) {
-            alert("Нет выбранных агентов. Добавьте агентов в рабочий набор.");
-            return;
-          }
-          localStorage.setItem(
-            "selectedAgents",
-            JSON.stringify(selectedAgents),
-          );
-          window.open("varlogscmd.html", "_blank");
-        });
-      }
-
-      // Обработчик кнопки ЗАПУСК
+      // ==================== ЗАПУСК ====================
       runButton.addEventListener("click", () => {
-        const agents = getSelectedAgentsData();
-        if (agents.length === 0) {
-          alert(
-            "Нет выбранных агентов. Добавьте хотя бы одного агента в рабочий набор.",
-          );
+        // Сбор выбранных агентов
+        const selectedAgents = [];
+        for (let i = 0; i < selectedAgentsList.options.length; i++) {
+          const opt = selectedAgentsList.options[i];
+          if (opt.disabled) continue;
+          selectedAgents.push({
+            id: opt.value,
+            name: opt.textContent,
+            ip: opt.dataset.ip || "",
+            key: opt.dataset.key || "",
+            comment: opt.dataset.comment || "",
+          });
+        }
+
+        // Сбор выбранных сценариев
+        const selectedScripts = [];
+        for (let i = 0; i < selectedScriptsList.options.length; i++) {
+          const opt = selectedScriptsList.options[i];
+          if (opt.disabled) continue;
+          selectedScripts.push(opt.textContent);
+        }
+
+        if (selectedAgents.length === 0) {
+          alert("Нет выбранных агентов. Добавьте агентов в рабочий набор.");
           return;
         }
-        localStorage.setItem("selectedAgents", JSON.stringify(agents));
-        // Открыть страницу мониторинга в новой вкладке (или можно в текущей)
+
+        localStorage.setItem("selectedAgents", JSON.stringify(selectedAgents));
+        localStorage.setItem(
+          "selectedScripts",
+          JSON.stringify(selectedScripts),
+        );
         window.open("varlogscmd.html", "_blank");
       });
+
+      // Инициализация заглушек
+      clearSelectedAgents();
+      clearSelectedScripts();
     </script>
   </body>
 </html>

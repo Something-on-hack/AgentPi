@@ -3,8 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Мониторинг хостов | Лог скрипта + Терминал</title>
-    <!-- Bootstrap 5 + иконки (опционально) -->
+    <title>Мониторинг хостов | Лог + Терминал + Сценарии</title>
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
       rel="stylesheet"
@@ -18,7 +17,6 @@
           -apple-system,
           "Segoe UI",
           Roboto,
-          "Helvetica Neue",
           sans-serif;
         padding: 20px;
       }
@@ -30,7 +28,7 @@
       .log-container {
         background: #0f1117;
         color: #e2e8f0;
-        font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+        font-family: "SF Mono", "Fira Code", monospace;
         font-size: 0.85rem;
         height: 280px;
         overflow-y: auto;
@@ -45,7 +43,6 @@
         background: #1a1e2a;
         border-radius: 6px;
         word-break: break-word;
-        transition: 0.1s;
       }
       .log-line.warning {
         border-left-color: #f59e0b;
@@ -74,13 +71,12 @@
       .terminal-output {
         background: #0a0e14;
         color: #cbd5e6;
-        font-family: "SF Mono", "Fira Code", monospace;
+        font-family: monospace;
         font-size: 0.85rem;
         height: 220px;
         overflow-y: auto;
         padding: 12px;
         white-space: pre-wrap;
-        word-break: break-word;
       }
       .terminal-line {
         margin-bottom: 4px;
@@ -112,20 +108,14 @@
         flex: 1;
         outline: none;
       }
-      #termInput:focus {
-        border-bottom: 1px solid #3b82f6;
-      }
-      .card-header .btn-sm {
-        margin-left: 12px;
-      }
       .host-list-group {
-        max-height: 460px;
+        max-height: 400px;
         overflow-y: auto;
       }
       .host-item {
         cursor: pointer;
-        transition: all 0.2s;
         border-left: 3px solid transparent;
+        transition: all 0.2s;
       }
       .host-item:hover {
         background-color: #e9ecef;
@@ -138,24 +128,35 @@
         font-weight: 500;
       }
       .badge-host-status {
-        background-color: #2ecc71;
         width: 8px;
         height: 8px;
         border-radius: 50%;
         display: inline-block;
         margin-right: 8px;
-        box-shadow: 0 0 2px #2ecc71;
+        background-color: #2ecc71;
       }
-      ::-webkit-scrollbar {
-        width: 6px;
+      .script-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid #dee2e6;
       }
-      ::-webkit-scrollbar-track {
-        background: #1e293b;
-        border-radius: 4px;
+      .script-item:last-child {
+        border-bottom: none;
       }
-      ::-webkit-scrollbar-thumb {
-        background: #475569;
-        border-radius: 4px;
+      @keyframes pulse {
+        0% {
+          opacity: 0.4;
+          transform: scale(0.8);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+      .live-dot {
+        box-shadow: 0 0 4px #ffb347;
       }
     </style>
   </head>
@@ -163,11 +164,11 @@
     <div class="container-fluid px-0">
       <h1 class="d-flex align-items-center gap-2">
         <span>🖥️</span> Система мониторинга и выполнения сценариев
-        <span class="badge bg-primary ms-3 fs-6">Live + терминал</span>
+        <span class="badge bg-primary ms-3 fs-6">Терминал + сценарии</span>
       </h1>
 
       <div class="row g-4">
-        <!-- ЛЕВАЯ КОЛОНКА: СПИСОК ХОСТОВ -->
+        <!-- Левая колонка: хосты и сценарии -->
         <div class="col-lg-4 col-md-5">
           <div class="card shadow-sm border-0">
             <div
@@ -183,21 +184,26 @@
               ></div>
             </div>
             <div class="card-footer bg-transparent text-muted small">
-              <i class="bi bi-info-circle"></i> Клик по хосту → добавит событие
-              в лог и эмуляцию проверки
+              <i class="bi bi-info-circle"></i> Клик по хосту → выбор для
+              запуска сценариев
             </div>
           </div>
-          <div class="card mt-3 shadow-sm border-0">
-            <div class="card-body py-2 px-3">
-              <span class="text-secondary"
-                >💡 В терминале доступны: help, ping &lt;хост&gt;, exec, log,
-                clear, select &lt;хост&gt;, hosts, date, status</span
-              >
+
+          <!-- Блок сценариев -->
+          <div class="card shadow-sm border-0 mt-3">
+            <div class="card-header bg-dark text-white">
+              <h4 class="mb-0 fs-5">📜 Выбранные сценарии</h4>
+            </div>
+            <div class="card-body p-0" id="scriptsContainer">
+              <div class="text-muted p-3">Загрузка сценариев...</div>
+            </div>
+            <div class="card-footer bg-transparent text-muted small">
+              Выберите хост и нажмите «Запустить» для выполнения сценария
             </div>
           </div>
         </div>
 
-        <!-- ПРАВАЯ КОЛОНКА: ЛОГ + ТЕРМИНАЛ -->
+        <!-- Правая колонка: лог + терминал -->
         <div class="col-lg-8 col-md-7">
           <div class="card shadow-sm border-0 mb-4">
             <div
@@ -215,9 +221,7 @@
                     animation: pulse 1.2s infinite;
                   "
                 ></span>
-                <h4 class="mb-0 fs-5">
-                  ⚙️ Лог выполнения скрипта (Live-поток)
-                </h4>
+                <h4 class="mb-0 fs-5">⚙️ Лог выполнения сценариев</h4>
               </div>
               <button class="btn btn-sm btn-light" id="clearLogBtn">
                 🧹 Очистить лог
@@ -226,15 +230,16 @@
             <div class="card-body p-0">
               <div class="log-container" id="logContainer">
                 <div class="log-line success">
-                  <span class="log-time">[START]</span>
-                  <span class="log-message"
-                    >🚀 Мониторинг-агент активирован. Отслеживание
-                    хостов...</span
+                  <span class="log-time">[START]</span
+                  ><span class="log-message"
+                    >🚀 Система готова к выполнению сценариев.</span
                   >
                 </div>
                 <div class="log-line">
-                  <span class="log-time">[INIT]</span>
-                  <span class="log-message">📡 Загружены конфигурации.</span>
+                  <span class="log-time">[INIT]</span
+                  ><span class="log-message"
+                    >📡 Загружены агенты и сценарии.</span
+                  >
                 </div>
               </div>
             </div>
@@ -245,8 +250,8 @@
               class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
             >
               <span
-                ><span class="me-2">🐚</span> Терминал (Windows CMD /
-                Bash-подобная оболочка)</span
+                ><span class="me-2">🐚</span> Терминал (CMD / Bash-подобная
+                оболочка)</span
               >
               <button class="btn btn-sm btn-outline-light" id="clearTermBtn">
                 🗑️ Очистить терминал
@@ -262,7 +267,7 @@
                     (c) Корпорация Майкрософт. Все права защищены.
                   </div>
                   <div class="terminal-line">
-                    ✨ Добро пожаловать в эмулятор. Введите 'help' для команд.
+                    ✨ Добро пожаловать. Введите 'help' для команд.
                   </div>
                   <div class="terminal-line">
                     📌 Пример: ping web-prod-ams | exec deploy
@@ -285,31 +290,16 @@
       </div>
     </div>
 
-    <style>
-      @keyframes pulse {
-        0% {
-          opacity: 0.4;
-          transform: scale(0.8);
-        }
-        100% {
-          opacity: 1;
-          transform: scale(1.2);
-        }
-      }
-      .live-dot {
-        box-shadow: 0 0 4px #ffb347;
-      }
-    </style>
-
     <script>
-      // ------------------- ДАННЫЕ ХОСТОВ ЗАГРУЖАЮТСЯ ИЗ localStorage -------------------
+      // ------------------- ДАННЫЕ ИЗ localStorage -------------------
       let hostsData = [];
+      let scriptsList = [];
 
-      function loadHostsFromStorage() {
-        const stored = localStorage.getItem("selectedAgents");
-        if (stored) {
+      function loadDataFromStorage() {
+        const storedAgents = localStorage.getItem("selectedAgents");
+        if (storedAgents) {
           try {
-            const agents = JSON.parse(stored);
+            const agents = JSON.parse(storedAgents);
             hostsData = agents.map((agent) => ({
               id: agent.id,
               name: agent.name,
@@ -317,14 +307,10 @@
               ip: agent.ip,
               role: agent.comment || "agent",
             }));
-            // Можно очистить, чтобы при обновлении страницы не оставались старые данные
-            // localStorage.removeItem('selectedAgents');
           } catch (e) {
-            console.error("Ошибка парсинга агентов:", e);
+            console.error(e);
           }
         }
-
-        // Если нет данных или массив пуст — резервные демо-хосты
         if (!hostsData.length) {
           hostsData = [
             {
@@ -348,40 +334,27 @@
               ip: "172.18.2.10",
               role: "database",
             },
-            {
-              id: "cache-ny-mem02",
-              name: "cache-ny-mem02",
-              icon: "⚡",
-              ip: "192.168.55.12",
-              role: "cache",
-            },
-            {
-              id: "monitor-graf",
-              name: "monitor-graf",
-              icon: "📈",
-              ip: "10.0.10.99",
-              role: "monitoring",
-            },
-            {
-              id: "backup-nas-01",
-              name: "backup-nas-01",
-              icon: "💾",
-              ip: "10.10.30.4",
-              role: "storage",
-            },
-            {
-              id: "k8s-worker-03",
-              name: "k8s-worker-03",
-              icon: "☸️",
-              ip: "192.168.77.23",
-              role: "k8s",
-            },
+          ];
+        }
+
+        const storedScripts = localStorage.getItem("selectedScripts");
+        if (storedScripts) {
+          try {
+            scriptsList = JSON.parse(storedScripts);
+          } catch (e) {
+            console.error(e);
+          }
+        }
+        if (!scriptsList.length) {
+          scriptsList = [
+            "Сценарий 1 (nmap)",
+            "Сценарий 2 (мониторинг)",
+            "Сценарий 3 (деплой)",
           ];
         }
       }
 
-      // Загружаем данные ДО того, как будут объявлены DOM элементы
-      loadHostsFromStorage();
+      loadDataFromStorage();
 
       // DOM элементы
       const hostListContainer = document.getElementById("hostListContainer");
@@ -390,6 +363,7 @@
       const termInput = document.getElementById("termInput");
       const clearLogBtn = document.getElementById("clearLogBtn");
       const clearTermBtn = document.getElementById("clearTermBtn");
+      const scriptsContainer = document.getElementById("scriptsContainer");
 
       // ------------------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ -------------------
       function getTimestamp() {
@@ -403,22 +377,18 @@
         if (type === "warning") logLine.classList.add("warning");
         if (type === "error") logLine.classList.add("error");
         if (type === "success") logLine.classList.add("success");
-
         const timeSpan = document.createElement("span");
         timeSpan.className = "log-time";
         timeSpan.textContent = `[${getTimestamp()}]`;
         const msgSpan = document.createElement("span");
         msgSpan.className = "log-message";
         msgSpan.textContent = message;
-
         logLine.appendChild(timeSpan);
         logLine.appendChild(msgSpan);
         logContainer.appendChild(logLine);
         logLine.scrollIntoView({ behavior: "smooth", block: "nearest" });
-
-        while (logContainer.children.length > 450) {
+        if (logContainer.children.length > 450)
           logContainer.removeChild(logContainer.firstChild);
-        }
       }
 
       function addTerminalLine(text, isError = false) {
@@ -433,7 +403,6 @@
       function clearLog() {
         logContainer.innerHTML = "";
         addToLog("Лог очищен пользователем", "warning");
-        addToLog("Система продолжает генерировать события...", "info");
       }
 
       function clearTerminal() {
@@ -442,266 +411,69 @@
         addTerminalLine("Введите help для списка команд.");
       }
 
-      // -------- ЛОГИКА КОМАНД ТЕРМИНАЛА --------
-      function processCommand(rawCmd) {
-        let cmd = rawCmd.trim();
-        if (cmd === "") return;
-        addTerminalLine(`PS> ${cmd}`);
-
-        const parts = cmd.split(/\s+/);
-        const mainCmd = parts[0].toLowerCase();
-        const args = parts.slice(1);
-
-        if (mainCmd === "help") {
-          addTerminalLine("Доступные команды:");
-          addTerminalLine("  help                 - эта справка");
-          addTerminalLine("  clear                - очистить окно терминала");
-          addTerminalLine("  hosts                - показать список хостов");
-          addTerminalLine(
-            "  ping <hostname>      - проверить доступность хоста",
-          );
-          addTerminalLine(
-            "  exec <имя скрипта>   - запустить пользовательский скрипт",
-          );
-          addTerminalLine(
-            "  log [N]              - показать последние N строк лога (по умолч. 5)",
-          );
-          addTerminalLine(
-            "  select <hostname>    - выбрать хост и показать метрики",
-          );
-          addTerminalLine("  echo <текст>         - вывести текст");
-          addTerminalLine("  date                 - текущая дата и время");
-          addTerminalLine("  status               - общая статистика системы");
-          addTerminalLine(
-            "  run-monitor          - принудительный опрос всех хостов",
-          );
-          return;
-        }
-        if (mainCmd === "clear") {
-          clearTerminal();
-          return;
-        }
-        if (mainCmd === "hosts") {
-          const hostNames = hostsData.map((h) => h.name).join(", ");
-          addTerminalLine(
-            `📡 Список хостов (${hostsData.length}): ${hostNames}`,
-          );
-          hostsData.forEach((h) =>
-            addTerminalLine(`   - ${h.name} (${h.ip}) [${h.role}]`),
-          );
-          return;
-        }
-        if (mainCmd === "ping") {
-          if (args.length === 0) {
-            addTerminalLine("❌ Укажите имя хоста. Пример: ping web-prod-ams");
-            return;
-          }
-          const target = args[0];
-          const found = hostsData.find((h) => h.name === target);
-          if (!found) {
-            addTerminalLine(
-              `❌ Хост "${target}" не найден. Используйте 'hosts' для просмотра.`,
-            );
-            return;
-          }
-          addTerminalLine(`🏓 Отправка ping на ${target} (${found.ip}) ...`);
-          setTimeout(() => {
-            const latency = Math.floor(Math.random() * 40) + 1;
-            addTerminalLine(`✅ Ответ от ${target}: время=${latency}ms TTL=58`);
-            addToLog(
-              `PING от терминала: хост ${target} ответил за ${latency}ms`,
-              "success",
-            );
-          }, 500);
-          return;
-        }
-        if (mainCmd === "exec") {
-          if (args.length === 0) {
-            addTerminalLine("Укажите имя скрипта. Пример: exec backup-db");
-            return;
-          }
-          const scriptName = args.join(" ");
-          addTerminalLine(`[Скрипт] Запуск: ${scriptName} ...`);
+      // ------------------- ЗАПУСК СЦЕНАРИЯ НА ХОСТЕ -------------------
+      function runScriptOnHost(scriptName, host) {
+        if (!host) {
           addToLog(
-            `🧩 Пользователь запустил скрипт "${scriptName}" через терминал`,
-            "info",
+            `Ошибка: не выбран хост для сценария "${scriptName}"`,
+            "error",
           );
-          setTimeout(() => {
-            const rand = Math.random();
-            if (rand > 0.2) {
-              addTerminalLine(
-                `✅ Скрипт ${scriptName} завершён успешно (код 0)`,
-              );
-              addToLog(`Скрипт ${scriptName} выполнен успешно`, "success");
-            } else {
-              addTerminalLine(
-                `❌ Ошибка выполнения ${scriptName}: таймаут подключения`,
-              );
-              addToLog(`Сбой скрипта ${scriptName}`, "error");
-            }
-          }, 800);
-          return;
-        }
-        if (mainCmd === "log") {
-          let count = 5;
-          if (args.length > 0 && !isNaN(parseInt(args[0]))) {
-            count = Math.min(parseInt(args[0]), 20);
-          }
-          const logEntries = Array.from(
-            logContainer.querySelectorAll(".log-line"),
-          ).slice(-count);
-          if (logEntries.length === 0) {
-            addTerminalLine("Лог пуст.");
-          } else {
-            addTerminalLine(`📋 Последние ${logEntries.length} записей лога:`);
-            logEntries.forEach((entry) => {
-              const raw = entry.innerText.trim();
-              addTerminalLine(`  ${raw}`);
-            });
-          }
-          return;
-        }
-        if (mainCmd === "select") {
-          if (args.length === 0) {
-            addTerminalLine("Укажите имя хоста. Пример: select alpha-core-01");
-            return;
-          }
-          const target = args[0];
-          const hostObj = hostsData.find((h) => h.name === target);
-          if (!hostObj) {
-            addTerminalLine(`❌ Хост "${target}" не существует.`);
-            return;
-          }
-          addTerminalLine(`🎯 Выбран хост: ${target}. Сбор диагностики...`);
-          addToLog(
-            `(Терминал) выбран хост ${target} — инициирован сбор метрик`,
-            "info",
+          addTerminalLine(
+            `❌ Не выбран хост для сценария "${scriptName}"`,
+            true,
           );
-          setTimeout(() => {
-            const cpuLoad = Math.floor(Math.random() * 70) + 10;
-            const memUsage = Math.floor(Math.random() * 50) + 20;
-            addTerminalLine(
-              `📊 Статус ${target}: CPU ${cpuLoad}% | RAM ${memUsage}% | диски OK`,
-            );
-            addToLog(
-              `Данные с ${target}: загрузка CPU ${cpuLoad}%, память ${memUsage}%`,
-              "success",
-            );
-            const hostElement = document.querySelector(
-              `.host-item[data-host="${target}"]`,
-            );
-            if (hostElement) {
-              hostElement.style.backgroundColor = "#cfe2ff";
-              setTimeout(() => (hostElement.style.backgroundColor = ""), 400);
-            }
-          }, 500);
           return;
         }
-        if (mainCmd === "echo") {
-          const text = args.join(" ") || "";
-          addTerminalLine(text);
-          return;
-        }
-        if (mainCmd === "date") {
-          addTerminalLine(new Date().toString());
-          return;
-        }
-        if (mainCmd === "status") {
-          addTerminalLine("🔍 Проверка состояния системы...");
-          addToLog("Запрос статуса через терминал", "info");
-          setTimeout(() => {
-            const online = hostsData.length - Math.floor(Math.random() * 2);
-            addTerminalLine(
-              `✅ Активных хостов: ${online}/${hostsData.length}`,
-            );
-            addTerminalLine(
-              `📌 Мониторинг-агент: активен, лог обновляется в реальном времени.`,
-            );
-            addTerminalLine(`💡 Общая нагрузка на контроллер: 23%`);
-          }, 400);
-          return;
-        }
-        if (mainCmd === "run-monitor") {
-          addTerminalLine("🔄 Принудительный запуск цикла мониторинга...");
-          addToLog("Ручной запуск проверок всех хостов", "warning");
-          setTimeout(() => {
-            addTerminalLine("✅ Мониторинг выполнен: все узлы отвечают.");
-            addToLog(
-              "Скрипт мониторинга завершил опрос хостов (успешно)",
-              "success",
-            );
-          }, 700);
-          return;
-        }
-        addTerminalLine(
-          `Неизвестная команда: "${mainCmd}". Введите 'help' для справки.`,
+        addToLog(
+          `▶️ Запуск сценария "${scriptName}" на хосте ${host.name} (${host.ip})`,
+          "info",
         );
-      }
+        addTerminalLine(
+          `[${getTimestamp()}] Запуск: ${scriptName} → ${host.name}`,
+        );
 
-      // ------------------- ГЕНЕРАТОР СОБЫТИЙ В РЕАЛЬНОМ ВРЕМЕНИ -------------------
-      let realtimeInterval;
-      function startLiveLogGenerator() {
-        if (realtimeInterval) clearInterval(realtimeInterval);
-        realtimeInterval = setInterval(() => {
-          const eventsPool = [
-            {
-              msg: "🔄 Агент синхронизации: обновление конфигураций на всех хостах",
-              type: "info",
-            },
-            {
-              msg: "📊 Сбор метрик CPU/память: среднее значение 34%",
-              type: "info",
-            },
-            {
-              msg: "✅ Пинг до web-prod-ams: успешно, задержка 4ms",
-              type: "success",
-            },
-            {
-              msg: "🧹 Очистка логов на backup-nas-01: освобождено 128MB",
-              type: "info",
-            },
-            {
-              msg: "⚠️ Высокий уровень I/O на db-replica-lon (латентность)",
-              type: "warning",
-            },
-            { msg: "📦 Развертывание hotfix на k8s-worker-03", type: "info" },
-            {
-              msg: "🔐 Ротация SSL-сертификатов через 48 часов",
-              type: "warning",
-            },
-            {
-              msg: "💾 Создание снапшота БД на alpha-core-01",
-              type: "success",
-            },
-            {
-              msg: "🌐 Обнаружена новая сетевая политика, применение...",
-              type: "info",
-            },
-            {
-              msg: "🔁 Перезагрузка сервиса мониторинга на monitor-graf",
-              type: "warning",
-            },
-            {
-              msg: "📈 Сбор логов с cache-ny-mem02: запись 240 событий/сек",
-              type: "info",
-            },
-          ];
-          const randomEvent =
-            eventsPool[Math.floor(Math.random() * eventsPool.length)];
-          addToLog(randomEvent.msg, randomEvent.type);
+        setTimeout(() => {
+          const lowerScript = scriptName.toLowerCase();
+          let resultMsg = "";
+          let resultType = "success";
+          let details = "";
 
-          if (Math.random() < 0.35 && hostsData.length > 0) {
-            const randomHost =
-              hostsData[Math.floor(Math.random() * hostsData.length)];
-            addToLog(
-              `📡 Скрипт опрашивает хост ${randomHost.name} (keepalive)`,
-              "info",
+          if (lowerScript.includes("nmap")) {
+            const openPorts = [22, 80, 443, 3306, 8080].slice(
+              0,
+              Math.floor(Math.random() * 3) + 2,
             );
+            resultMsg = `🔍 Nmap-сканирование ${host.name} (${host.ip}) завершено. Открытые порты: ${openPorts.join(", ")}`;
+            details = `Nmap 7.80: ${openPorts.length} портов открыто, 1000 закрытых.`;
+          } else if (lowerScript.includes("мониторинг")) {
+            const cpu = Math.floor(Math.random() * 70) + 10;
+            const mem = Math.floor(Math.random() * 60) + 20;
+            resultMsg = `📊 Мониторинг ${host.name}: CPU ${cpu}%, RAM ${mem}%, диск OK`;
+            details = `Загрузка системы в пределах нормы.`;
+          } else if (
+            lowerScript.includes("деплой") ||
+            lowerScript.includes("deploy")
+          ) {
+            const success = Math.random() > 0.2;
+            resultMsg = success
+              ? `✅ Деплой на ${host.name} выполнен успешно (версия 2.3.1)`
+              : `❌ Ошибка деплоя на ${host.name}: не удалось подключиться к репозиторию`;
+            resultType = success ? "success" : "error";
+            details = success
+              ? "Приложение перезапущено."
+              : "Проверьте сетевые настройки.";
+          } else {
+            resultMsg = `📝 Выполнение пользовательского сценария "${scriptName}" на ${host.name} завершено. Код возврата 0.`;
+            details = `Сценарий отработал штатно.`;
           }
-        }, 5200);
+
+          addToLog(resultMsg, resultType);
+          addTerminalLine(`[${getTimestamp()}] ${resultMsg}`);
+          if (details) addTerminalLine(`   ${details}`);
+        }, 800);
       }
 
-      // ------------------- ЗАПОЛНЕНИЕ СПИСКА ХОСТОВ -------------------
+      // ------------------- ОТРИСОВКА ХОСТОВ -------------------
       function renderHostsList() {
         hostListContainer.innerHTML = "";
         hostsData.forEach((host) => {
@@ -717,76 +489,224 @@
           `;
           hostDiv.addEventListener("click", (e) => {
             e.stopPropagation();
-            addToLog(
-              `🖱️ Выбран хост: ${host.name} — запуск профилирования`,
-              "info",
+            addToLog(`🖱️ Выбран хост: ${host.name}`, "info");
+            addTerminalLine(
+              `[система] Выбран хост ${host.name} для запуска сценариев.`,
             );
-            setTimeout(() => {
-              const cpuVal = Math.floor(Math.random() * 60) + 10;
-              addToLog(
-                `✅ [${host.name}] системные данные: CPU ${cpuVal}% | uptime 12d`,
-                "success",
-              );
-              addToLog(
-                `🔍 Дополнительная проверка: сервисы на ${host.name} работают стабильно`,
-                "info",
-              );
-              addTerminalLine(
-                `[система] Хост ${host.name} просканирован (CPU ${cpuVal}%)`,
-              );
-            }, 300);
-            hostDiv.style.transform = "scale(1.01)";
-            setTimeout(() => (hostDiv.style.transform = ""), 150);
+            document
+              .querySelectorAll(".host-item")
+              .forEach((el) => el.classList.remove("active"));
+            hostDiv.classList.add("active");
           });
           hostListContainer.appendChild(hostDiv);
         });
         document.getElementById("hostCount").innerText = hostsData.length;
+        if (hostsData.length) {
+          const firstHost = hostListContainer.querySelector(".host-item");
+          if (firstHost) firstHost.classList.add("active");
+        }
+      }
+
+      // ------------------- ОТРИСОВКА СЦЕНАРИЕВ -------------------
+      function renderScripts() {
+        if (!scriptsContainer) return;
+        if (!scriptsList.length) {
+          scriptsContainer.innerHTML = `<div class="text-muted p-3">Нет выбранных сценариев. Вернитесь на главную страницу и добавьте сценарии.</div>`;
+          return;
+        }
+
+        const hostSelectHtml = `
+          <div class="p-3 border-bottom">
+            <label class="form-label fw-semibold">🎯 Выберите хост для запуска:</label>
+            <select class="form-select" id="globalHostSelect">
+              ${hostsData.map((h) => `<option value="${h.name}">${h.name} (${h.ip})</option>`).join("")}
+            </select>
+          </div>
+        `;
+        const scriptsHtml = scriptsList
+          .map(
+            (script) => `
+          <div class="script-item">
+            <span>📜 ${script}</span>
+            <button class="btn btn-sm btn-primary run-script-btn" data-script="${script.replace(/"/g, "&quot;")}">🚀 Запустить</button>
+          </div>
+        `,
+          )
+          .join("");
+
+        scriptsContainer.innerHTML =
+          hostSelectHtml + `<div class="scripts-list">${scriptsHtml}</div>`;
+
+        document.querySelectorAll(".run-script-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const scriptName = btn.getAttribute("data-script");
+            const selectedHostName =
+              document.getElementById("globalHostSelect").value;
+            const host = hostsData.find((h) => h.name === selectedHostName);
+            runScriptOnHost(scriptName, host);
+          });
+        });
+      }
+
+      // ------------------- КОМАНДЫ ТЕРМИНАЛА -------------------
+      function processCommand(rawCmd) {
+        let cmd = rawCmd.trim();
+        if (cmd === "") return;
+        addTerminalLine(`PS> ${cmd}`);
+        const parts = cmd.split(/\s+/);
+        const mainCmd = parts[0].toLowerCase();
+        const args = parts.slice(1);
+
+        if (mainCmd === "help") {
+          addTerminalLine(
+            "Доступные команды: help, clear, hosts, ping <host>, exec <script>, log [N], select <host>, echo, date, status, run-monitor, scripts",
+          );
+          return;
+        }
+        if (mainCmd === "clear") {
+          clearTerminal();
+          return;
+        }
+        if (mainCmd === "hosts") {
+          addTerminalLine(
+            `Хосты (${hostsData.length}): ${hostsData.map((h) => h.name).join(", ")}`,
+          );
+          return;
+        }
+        if (mainCmd === "ping") {
+          if (!args.length) {
+            addTerminalLine("❌ Укажите имя хоста");
+            return;
+          }
+          const target = args[0];
+          const host = hostsData.find((h) => h.name === target);
+          if (!host) {
+            addTerminalLine(`❌ Хост "${target}" не найден`);
+            return;
+          }
+          addTerminalLine(`🏓 Пингую ${target} (${host.ip})...`);
+          setTimeout(
+            () =>
+              addTerminalLine(
+                `✅ Ответ от ${target}: время=${Math.floor(Math.random() * 40) + 1}ms`,
+              ),
+            500,
+          );
+          return;
+        }
+        if (mainCmd === "exec") {
+          if (!args.length) {
+            addTerminalLine("Укажите имя сценария. Пример: exec nmap");
+            return;
+          }
+          const script = args.join(" ");
+          const activeHostElem = document.querySelector(".host-item.active");
+          let host = null;
+          if (activeHostElem) {
+            const hostName = activeHostElem.getAttribute("data-host");
+            host = hostsData.find((h) => h.name === hostName);
+          }
+          if (!host && hostsData.length) host = hostsData[0];
+          if (!host) {
+            addTerminalLine("Нет доступных хостов");
+            return;
+          }
+          runScriptOnHost(script, host);
+          return;
+        }
+        if (mainCmd === "scripts") {
+          addTerminalLine(
+            `Доступные сценарии: ${scriptsList.join(", ") || "нет"}`,
+          );
+          return;
+        }
+        if (mainCmd === "select") {
+          if (!args.length) {
+            addTerminalLine("Укажите имя хоста");
+            return;
+          }
+          const target = args[0];
+          const host = hostsData.find((h) => h.name === target);
+          if (!host) {
+            addTerminalLine(`❌ Хост "${target}" не найден`);
+            return;
+          }
+          addTerminalLine(`🎯 Выбран хост: ${target}`);
+          document
+            .querySelectorAll(".host-item")
+            .forEach((el) => el.classList.remove("active"));
+          const targetElem = document.querySelector(
+            `.host-item[data-host="${target}"]`,
+          );
+          if (targetElem) targetElem.classList.add("active");
+          addToLog(`Выбран хост ${target} через терминал`, "info");
+          return;
+        }
+        if (mainCmd === "log") {
+          let count = 5;
+          if (args.length > 0 && !isNaN(parseInt(args[0])))
+            count = Math.min(parseInt(args[0]), 20);
+          const logEntries = Array.from(
+            logContainer.querySelectorAll(".log-line"),
+          ).slice(-count);
+          if (logEntries.length === 0) addTerminalLine("Лог пуст.");
+          else {
+            addTerminalLine(`📋 Последние ${logEntries.length} записей лога:`);
+            logEntries.forEach((entry) =>
+              addTerminalLine(`  ${entry.innerText.trim()}`),
+            );
+          }
+          return;
+        }
+        if (mainCmd === "echo") {
+          addTerminalLine(args.join(" ") || "");
+          return;
+        }
+        if (mainCmd === "date") {
+          addTerminalLine(new Date().toString());
+          return;
+        }
+        if (mainCmd === "status") {
+          addTerminalLine(`✅ Активных хостов: ${hostsData.length}`);
+          addTerminalLine(`📜 Сценариев загружено: ${scriptsList.length}`);
+          return;
+        }
+        if (mainCmd === "run-monitor") {
+          addTerminalLine("🔄 Принудительный мониторинг (имитация)");
+          addToLog("Ручной запуск проверок всех хостов", "warning");
+          setTimeout(() => {
+            addTerminalLine("✅ Мониторинг выполнен: все узлы отвечают.");
+            addToLog("Проверка хостов завершена успешно", "success");
+          }, 700);
+          return;
+        }
+        addTerminalLine(`Неизвестная команда: "${mainCmd}". Введите 'help'.`);
       }
 
       // ------------------- ИНИЦИАЛИЗАЦИЯ -------------------
       renderHostsList();
-      startLiveLogGenerator();
+      renderScripts();
 
       clearLogBtn.addEventListener("click", clearLog);
       clearTermBtn.addEventListener("click", clearTerminal);
-
       termInput.addEventListener("keypress", (e) => {
         if (e.key === "Enter") {
-          const command = termInput.value;
-          if (command.trim() !== "") {
-            processCommand(command);
-          }
+          processCommand(termInput.value);
           termInput.value = "";
-          termOutputDiv.scrollTop = termOutputDiv.scrollHeight;
         }
       });
-
       document
         .querySelector(".terminal-container")
-        .addEventListener("click", () => {
-          termInput.focus();
-        });
+        .addEventListener("click", () => termInput.focus());
 
       addToLog(
-        "🔥 Live-скрипт активирован: генерация событий каждые 5 секунд",
+        `✅ Система загружена: ${hostsData.length} хостов, ${scriptsList.length} сценариев.`,
         "success",
       );
       addToLog(
-        "💡 Кликните на любой хост слева — запустится сбор данных в реальном времени",
+        "💡 Выберите хост и запустите сценарий кнопкой или через терминал (exec <имя>).",
         "info",
       );
-      addToLog(
-        "⌨️ В терминале доступны команды: help, ping, exec, select, log и другие",
-        "info",
-      );
-
-      setTimeout(() => {
-        addToLog(
-          `🌐 Инициализирован периодический опрос ${hostsData.length} хостов (ICMP+HTTP)`,
-          "info",
-        );
-      }, 1800);
-
       termInput.focus();
     </script>
   </body>
