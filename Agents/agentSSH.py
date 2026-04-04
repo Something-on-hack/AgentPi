@@ -7,10 +7,10 @@ import os
 
 # --- КОНФИГУРАЦИЯ ДЛЯ ФЕРМЫ СЕРВЕРОВ ---
 # 1. Приватный ключ ЭТОГО сервера (Host Key - нужен для работы протокола SSH)
-SERVER_HOST_KEY_FILE = 'server_host_rsa'
+SERVER_HOST_KEY_FILE = os.path.join('keys', 'server_host_rsa')
 
 # 2. Файл с публичным ключом админа (раскопируйте этот файл на все серверы)
-ADMIN_PUB_KEY_FILE = 'admin_public_key.pub'
+ADMIN_PUB_KEY_FILE = os.path.join('keys', 'admin_public_key.pub')
 
 
 # ---------------------------------------
@@ -100,10 +100,12 @@ def start_node_server():
 
 def handle_admin_connection(client_sock, host_key, allowed_admin_key):
     try:
-        transport = paramiko.Transport(client_sock)
-        transport.add_server_key(host_key)
+        client_addr = client_sock.getpeername()
 
-        server_interface = FleetSSHServer(allowed_admin_key)
+        with paramiko.Transport(client_sock) as transport:  # Автоматически закроется
+            transport.add_server_key(host_key)
+            server_interface = FleetSSHServer(allowed_admin_key)
+
         try:
             transport.start_server(server=server_interface)
         except paramiko.SSHException as e:
@@ -122,6 +124,10 @@ def handle_admin_connection(client_sock, host_key, allowed_admin_key):
 
         # Исполнение команд
         while True:
+            if channel.closed:  # Проверка состояния канала
+                print("Канал был закрыт.")
+                break
+
             command = channel.recv(1024).decode('utf-8').strip()
             if not command:
                 continue
@@ -151,11 +157,12 @@ def handle_admin_connection(client_sock, host_key, allowed_admin_key):
             channel.send(b"> ")
 
     finally:
+        print(f"[+] Клиент {client_addr} отключился.")
         try:
             channel.close()
         except:
             pass
-        client_sock.close()
+        transport.close()
 
 
 if __name__ == "__main__":
