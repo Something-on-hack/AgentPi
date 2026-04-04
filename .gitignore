@@ -3,3 +3,5 @@ Python/.venv/
 .venv/
 .idea/
 *__pycache__/
+Python/keys/private/*
+Python/keys/public/*
