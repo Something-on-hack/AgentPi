@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Мониторинг хостов | Лог скрипта + Терминал</title>
+    <!-- Bootstrap 5 + иконки (опционально) -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+      body {
+        background: #f4f6f9;
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          "Helvetica Neue",
+          sans-serif;
+        padding: 20px;
+      }
+      h1 {
+        margin-bottom: 30px;
+        color: #0a58ca;
+        font-weight: 600;
+      }
+      .log-container {
+        background: #0f1117;
+        color: #e2e8f0;
+        font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+        font-size: 0.85rem;
+        height: 280px;
+        overflow-y: auto;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #2d3748;
+      }
+      .log-line {
+        margin-bottom: 6px;
+        padding: 4px 8px;
+        border-left: 3px solid #3b82f6;
+        background: #1a1e2a;
+        border-radius: 6px;
+        word-break: break-word;
+        transition: 0.1s;
+      }
+      .log-line.warning {
+        border-left-color: #f59e0b;
+        background: #2d241a;
+      }
+      .log-line.error {
+        border-left-color: #ef4444;
+        background: #2a1a1a;
+      }
+      .log-line.success {
+        border-left-color: #10b981;
+        background: #1a2a1f;
+      }
+      .log-time {
+        color: #7f8ea3;
+        margin-right: 12px;
+        font-weight: 500;
+        font-size: 0.7rem;
+      }
+      .terminal-container {
+        background: #03060c;
+        border-radius: 8px;
+        border: 1px solid #2d3748;
+        overflow: hidden;
+      }
+      .terminal-output {
+        background: #0a0e14;
+        color: #cbd5e6;
+        font-family: "SF Mono", "Fira Code", monospace;
+        font-size: 0.85rem;
+        height: 220px;
+        overflow-y: auto;
+        padding: 12px;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .terminal-line {
+        margin-bottom: 4px;
+        line-height: 1.4;
+      }
+      .terminal-input-row {
+        background: #070b10;
+        border-top: 1px solid #1e2a3a;
+        padding: 10px 15px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .prompt {
+        background: #1e293b;
+        padding: 4px 12px;
+        border-radius: 30px;
+        font-family: monospace;
+        font-weight: bold;
+        color: #50fa7b;
+        font-size: 0.8rem;
+      }
+      #termInput {
+        background: transparent;
+        border: none;
+        color: #f1f5f9;
+        font-family: monospace;
+        font-size: 0.85rem;
+        flex: 1;
+        outline: none;
+      }
+      #termInput:focus {
+        border-bottom: 1px solid #3b82f6;
+      }
+      .card-header .btn-sm {
+        margin-left: 12px;
+      }
+      .host-list-group {
+        max-height: 460px;
+        overflow-y: auto;
+      }
+      .host-item {
+        cursor: pointer;
+        transition: all 0.2s;
+        border-left: 3px solid transparent;
+      }
+      .host-item:hover {
+        background-color: #e9ecef;
+        border-left-color: #0a58ca;
+        transform: translateX(2px);
+      }
+      .host-item.active {
+        background-color: #cfe2ff;
+        border-left-color: #0a58ca;
+        font-weight: 500;
+      }
+      .badge-host-status {
+        background-color: #2ecc71;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        margin-right: 8px;
+        box-shadow: 0 0 2px #2ecc71;
+      }
+      ::-webkit-scrollbar {
+        width: 6px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #1e293b;
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #475569;
+        border-radius: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid px-0">
+      <h1 class="d-flex align-items-center gap-2">
+        <span>🖥️</span> Система мониторинга и выполнения сценариев
+        <span class="badge bg-primary ms-3 fs-6">Live + терминал</span>
+      </h1>
+
+      <div class="row g-4">
+        <!-- ЛЕВАЯ КОЛОНКА: СПИСОК ХОСТОВ -->
+        <div class="col-lg-4 col-md-5">
+          <div class="card shadow-sm border-0">
+            <div
+              class="card-header bg-primary text-white d-flex justify-content-between align-items-center"
+            >
+              <h4 class="mb-0 fs-5">📡 Список хостов (агенты)</h4>
+              <span class="badge bg-light text-dark" id="hostCount">0</span>
+            </div>
+            <div class="card-body p-0">
+              <div
+                class="list-group list-group-flush host-list-group"
+                id="hostListContainer"
+              ></div>
+            </div>
+            <div class="card-footer bg-transparent text-muted small">
+              <i class="bi bi-info-circle"></i> Клик по хосту → добавит событие
+              в лог и эмуляцию проверки
+            </div>
+          </div>
+          <div class="card mt-3 shadow-sm border-0">
+            <div class="card-body py-2 px-3">
+              <span class="text-secondary"
+                >💡 В терминале доступны: help, ping &lt;хост&gt;, exec, log,
+                clear, select &lt;хост&gt;, hosts, date, status</span
+              >
+            </div>
+          </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: ЛОГ + ТЕРМИНАЛ -->
+        <div class="col-lg-8 col-md-7">
+          <div class="card shadow-sm border-0 mb-4">
+            <div
+              class="card-header bg-success text-white d-flex justify-content-between align-items-center flex-wrap"
+            >
+              <div class="d-flex align-items-center gap-2">
+                <span
+                  class="live-dot"
+                  style="
+                    width: 12px;
+                    height: 12px;
+                    background: #ffb347;
+                    border-radius: 50%;
+                    display: inline-block;
+                    animation: pulse 1.2s infinite;
+                  "
+                ></span>
+                <h4 class="mb-0 fs-5">
+                  ⚙️ Лог выполнения скрипта (Live-поток)
+                </h4>
+              </div>
+              <button class="btn btn-sm btn-light" id="clearLogBtn">
+                🧹 Очистить лог
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="log-container" id="logContainer">
+                <div class="log-line success">
+                  <span class="log-time">[START]</span>
+                  <span class="log-message"
+                    >🚀 Мониторинг-агент активирован. Отслеживание
+                    хостов...</span
+                  >
+                </div>
+                <div class="log-line">
+                  <span class="log-time">[INIT]</span>
+                  <span class="log-message">📡 Загружены конфигурации.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card shadow-sm border-0">
+            <div
+              class="card-header bg-dark text-white d-flex justify-content-between align-items-center"
+            >
+              <span
+                ><span class="me-2">🐚</span> Терминал (Windows CMD /
+                Bash-подобная оболочка)</span
+              >
+              <button class="btn btn-sm btn-outline-light" id="clearTermBtn">
+                🗑️ Очистить терминал
+              </button>
+            </div>
+            <div class="card-body p-0">
+              <div class="terminal-container">
+                <div class="terminal-output" id="termOutput">
+                  <div class="terminal-line">
+                    Microsoft Windows [Version 10.0.22621]
+                  </div>
+                  <div class="terminal-line">
+                    (c) Корпорация Майкрософт. Все права защищены.
+                  </div>
+                  <div class="terminal-line">
+                    ✨ Добро пожаловать в эмулятор. Введите 'help' для команд.
+                  </div>
+                  <div class="terminal-line">
+                    📌 Пример: ping web-prod-ams | exec deploy
+                  </div>
+                  <div class="terminal-line">&nbsp;</div>
+                </div>
+                <div class="terminal-input-row">
+                  <span class="prompt">PS&gt;</span>
+                  <input
+                    type="text"
+                    id="termInput"
+                    placeholder="введите команду..."
+                    autofocus
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <style>
+      @keyframes pulse {
+        0% {
+          opacity: 0.4;
+          transform: scale(0.8);
+        }
+        100% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+      .live-dot {
+        box-shadow: 0 0 4px #ffb347;
+      }
+    </style>
+
+    <script>
+      // ------------------- ДАННЫЕ ХОСТОВ ЗАГРУЖАЮТСЯ ИЗ localStorage -------------------
+      let hostsData = [];
+
+      function loadHostsFromStorage() {
+        const stored = localStorage.getItem("selectedAgents");
+        if (stored) {
+          try {
+            const agents = JSON.parse(stored);
+            hostsData = agents.map((agent) => ({
+              id: agent.id,
+              name: agent.name,
+              icon: "🤖",
+              ip: agent.ip,
+              role: agent.comment || "agent",
+            }));
+            // Можно очистить, чтобы при обновлении страницы не оставались старые данные
+            // localStorage.removeItem('selectedAgents');
+          } catch (e) {
+            console.error("Ошибка парсинга агентов:", e);
+          }
+        }
+
+        // Если нет данных или массив пуст — резервные демо-хосты
+        if (!hostsData.length) {
+          hostsData = [
+            {
+              id: "alpha-core-01",
+              name: "alpha-core-01",
+              icon: "🌀",
+              ip: "192.168.10.1",
+              role: "core",
+            },
+            {
+              id: "web-prod-ams",
+              name: "web-prod-ams",
+              icon: "🌍",
+              ip: "10.12.20.5",
+              role: "web",
+            },
+            {
+              id: "db-replica-lon",
+              name: "db-replica-lon",
+              icon: "🗄️",
+              ip: "172.18.2.10",
+              role: "database",
+            },
+            {
+              id: "cache-ny-mem02",
+              name: "cache-ny-mem02",
+              icon: "⚡",
+              ip: "192.168.55.12",
+              role: "cache",
+            },
+            {
+              id: "monitor-graf",
+              name: "monitor-graf",
+              icon: "📈",
+              ip: "10.0.10.99",
+              role: "monitoring",
+            },
+            {
+              id: "backup-nas-01",
+              name: "backup-nas-01",
+              icon: "💾",
+              ip: "10.10.30.4",
+              role: "storage",
+            },
+            {
+              id: "k8s-worker-03",
+              name: "k8s-worker-03",
+              icon: "☸️",
+              ip: "192.168.77.23",
+              role: "k8s",
+            },
+          ];
+        }
+      }
+
+      // Загружаем данные ДО того, как будут объявлены DOM элементы
+      loadHostsFromStorage();
+
+      // DOM элементы
+      const hostListContainer = document.getElementById("hostListContainer");
+      const logContainer = document.getElementById("logContainer");
+      const termOutputDiv = document.getElementById("termOutput");
+      const termInput = document.getElementById("termInput");
+      const clearLogBtn = document.getElementById("clearLogBtn");
+      const clearTermBtn = document.getElementById("clearTermBtn");
+
+      // ------------------- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ -------------------
+      function getTimestamp() {
+        const now = new Date();
+        return `${now.getHours().toString().padStart(2, "0")}:${now.getMinutes().toString().padStart(2, "0")}:${now.getSeconds().toString().padStart(2, "0")}`;
+      }
+
+      function addToLog(message, type = "info") {
+        const logLine = document.createElement("div");
+        logLine.className = "log-line";
+        if (type === "warning") logLine.classList.add("warning");
+        if (type === "error") logLine.classList.add("error");
+        if (type === "success") logLine.classList.add("success");
+
+        const timeSpan = document.createElement("span");
+        timeSpan.className = "log-time";
+        timeSpan.textContent = `[${getTimestamp()}]`;
+        const msgSpan = document.createElement("span");
+        msgSpan.className = "log-message";
+        msgSpan.textContent = message;
+
+        logLine.appendChild(timeSpan);
+        logLine.appendChild(msgSpan);
+        logContainer.appendChild(logLine);
+        logLine.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+        while (logContainer.children.length > 450) {
+          logContainer.removeChild(logContainer.firstChild);
+        }
+      }
+
+      function addTerminalLine(text, isError = false) {
+        const lineDiv = document.createElement("div");
+        lineDiv.className = "terminal-line";
+        if (isError) lineDiv.style.color = "#f87171";
+        lineDiv.textContent = text;
+        termOutputDiv.appendChild(lineDiv);
+        termOutputDiv.scrollTop = termOutputDiv.scrollHeight;
+      }
+
+      function clearLog() {
+        logContainer.innerHTML = "";
+        addToLog("Лог очищен пользователем", "warning");
+        addToLog("Система продолжает генерировать события...", "info");
+      }
+
+      function clearTerminal() {
+        termOutputDiv.innerHTML = "";
+        addTerminalLine("Терминал очищен.");
+        addTerminalLine("Введите help для списка команд.");
+      }
+
+      // -------- ЛОГИКА КОМАНД ТЕРМИНАЛА --------
+      function processCommand(rawCmd) {
+        let cmd = rawCmd.trim();
+        if (cmd === "") return;
+        addTerminalLine(`PS> ${cmd}`);
+
+        const parts = cmd.split(/\s+/);
+        const mainCmd = parts[0].toLowerCase();
+        const args = parts.slice(1);
+
+        if (mainCmd === "help") {
+          addTerminalLine("Доступные команды:");
+          addTerminalLine("  help                 - эта справка");
+          addTerminalLine("  clear                - очистить окно терминала");
+          addTerminalLine("  hosts                - показать список хостов");
+          addTerminalLine(
+            "  ping <hostname>      - проверить доступность хоста",
+          );
+          addTerminalLine(
+            "  exec <имя скрипта>   - запустить пользовательский скрипт",
+          );
+          addTerminalLine(
+            "  log [N]              - показать последние N строк лога (по умолч. 5)",
+          );
+          addTerminalLine(
+            "  select <hostname>    - выбрать хост и показать метрики",
+          );
+          addTerminalLine("  echo <текст>         - вывести текст");
+          addTerminalLine("  date                 - текущая дата и время");
+          addTerminalLine("  status               - общая статистика системы");
+          addTerminalLine(
+            "  run-monitor          - принудительный опрос всех хостов",
+          );
+          return;
+        }
+        if (mainCmd === "clear") {
+          clearTerminal();
+          return;
+        }
+        if (mainCmd === "hosts") {
+          const hostNames = hostsData.map((h) => h.name).join(", ");
+          addTerminalLine(
+            `📡 Список хостов (${hostsData.length}): ${hostNames}`,
+          );
+          hostsData.forEach((h) =>
+            addTerminalLine(`   - ${h.name} (${h.ip}) [${h.role}]`),
+          );
+          return;
+        }
+        if (mainCmd === "ping") {
+          if (args.length === 0) {
+            addTerminalLine("❌ Укажите имя хоста. Пример: ping web-prod-ams");
+            return;
+          }
+          const target = args[0];
+          const found = hostsData.find((h) => h.name === target);
+          if (!found) {
+            addTerminalLine(
+              `❌ Хост "${target}" не найден. Используйте 'hosts' для просмотра.`,
+            );
+            return;
+          }
+          addTerminalLine(`🏓 Отправка ping на ${target} (${found.ip}) ...`);
+          setTimeout(() => {
+            const latency = Math.floor(Math.random() * 40) + 1;
+            addTerminalLine(`✅ Ответ от ${target}: время=${latency}ms TTL=58`);
+            addToLog(
+              `PING от терминала: хост ${target} ответил за ${latency}ms`,
+              "success",
+            );
+          }, 500);
+          return;
+        }
+        if (mainCmd === "exec") {
+          if (args.length === 0) {
+            addTerminalLine("Укажите имя скрипта. Пример: exec backup-db");
+            return;
+          }
+          const scriptName = args.join(" ");
+          addTerminalLine(`[Скрипт] Запуск: ${scriptName} ...`);
+          addToLog(
+            `🧩 Пользователь запустил скрипт "${scriptName}" через терминал`,
+            "info",
+          );
+          setTimeout(() => {
+            const rand = Math.random();
+            if (rand > 0.2) {
+              addTerminalLine(
+                `✅ Скрипт ${scriptName} завершён успешно (код 0)`,
+              );
+              addToLog(`Скрипт ${scriptName} выполнен успешно`, "success");
+            } else {
+              addTerminalLine(
+                `❌ Ошибка выполнения ${scriptName}: таймаут подключения`,
+              );
+              addToLog(`Сбой скрипта ${scriptName}`, "error");
+            }
+          }, 800);
+          return;
+        }
+        if (mainCmd === "log") {
+          let count = 5;
+          if (args.length > 0 && !isNaN(parseInt(args[0]))) {
+            count = Math.min(parseInt(args[0]), 20);
+          }
+          const logEntries = Array.from(
+            logContainer.querySelectorAll(".log-line"),
+          ).slice(-count);
+          if (logEntries.length === 0) {
+            addTerminalLine("Лог пуст.");
+          } else {
+            addTerminalLine(`📋 Последние ${logEntries.length} записей лога:`);
+            logEntries.forEach((entry) => {
+              const raw = entry.innerText.trim();
+              addTerminalLine(`  ${raw}`);
+            });
+          }
+          return;
+        }
+        if (mainCmd === "select") {
+          if (args.length === 0) {
+            addTerminalLine("Укажите имя хоста. Пример: select alpha-core-01");
+            return;
+          }
+          const target = args[0];
+          const hostObj = hostsData.find((h) => h.name === target);
+          if (!hostObj) {
+            addTerminalLine(`❌ Хост "${target}" не существует.`);
+            return;
+          }
+          addTerminalLine(`🎯 Выбран хост: ${target}. Сбор диагностики...`);
+          addToLog(
+            `(Терминал) выбран хост ${target} — инициирован сбор метрик`,
+            "info",
+          );
+          setTimeout(() => {
+            const cpuLoad = Math.floor(Math.random() * 70) + 10;
+            const memUsage = Math.floor(Math.random() * 50) + 20;
+            addTerminalLine(
+              `📊 Статус ${target}: CPU ${cpuLoad}% | RAM ${memUsage}% | диски OK`,
+            );
+            addToLog(
+              `Данные с ${target}: загрузка CPU ${cpuLoad}%, память ${memUsage}%`,
+              "success",
+            );
+            const hostElement = document.querySelector(
+              `.host-item[data-host="${target}"]`,
+            );
+            if (hostElement) {
+              hostElement.style.backgroundColor = "#cfe2ff";
+              setTimeout(() => (hostElement.style.backgroundColor = ""), 400);
+            }
+          }, 500);
+          return;
+        }
+        if (mainCmd === "echo") {
+          const text = args.join(" ") || "";
+          addTerminalLine(text);
+          return;
+        }
+        if (mainCmd === "date") {
+          addTerminalLine(new Date().toString());
+          return;
+        }
+        if (mainCmd === "status") {
+          addTerminalLine("🔍 Проверка состояния системы...");
+          addToLog("Запрос статуса через терминал", "info");
+          setTimeout(() => {
+            const online = hostsData.length - Math.floor(Math.random() * 2);
+            addTerminalLine(
+              `✅ Активных хостов: ${online}/${hostsData.length}`,
+            );
+            addTerminalLine(
+              `📌 Мониторинг-агент: активен, лог обновляется в реальном времени.`,
+            );
+            addTerminalLine(`💡 Общая нагрузка на контроллер: 23%`);
+          }, 400);
+          return;
+        }
+        if (mainCmd === "run-monitor") {
+          addTerminalLine("🔄 Принудительный запуск цикла мониторинга...");
+          addToLog("Ручной запуск проверок всех хостов", "warning");
+          setTimeout(() => {
+            addTerminalLine("✅ Мониторинг выполнен: все узлы отвечают.");
+            addToLog(
+              "Скрипт мониторинга завершил опрос хостов (успешно)",
+              "success",
+            );
+          }, 700);
+          return;
+        }
+        addTerminalLine(
+          `Неизвестная команда: "${mainCmd}". Введите 'help' для справки.`,
+        );
+      }
+
+      // ------------------- ГЕНЕРАТОР СОБЫТИЙ В РЕАЛЬНОМ ВРЕМЕНИ -------------------
+      let realtimeInterval;
+      function startLiveLogGenerator() {
+        if (realtimeInterval) clearInterval(realtimeInterval);
+        realtimeInterval = setInterval(() => {
+          const eventsPool = [
+            {
+              msg: "🔄 Агент синхронизации: обновление конфигураций на всех хостах",
+              type: "info",
+            },
+            {
+              msg: "📊 Сбор метрик CPU/память: среднее значение 34%",
+              type: "info",
+            },
+            {
+              msg: "✅ Пинг до web-prod-ams: успешно, задержка 4ms",
+              type: "success",
+            },
+            {
+              msg: "🧹 Очистка логов на backup-nas-01: освобождено 128MB",
+              type: "info",
+            },
+            {
+              msg: "⚠️ Высокий уровень I/O на db-replica-lon (латентность)",
+              type: "warning",
+            },
+            { msg: "📦 Развертывание hotfix на k8s-worker-03", type: "info" },
+            {
+              msg: "🔐 Ротация SSL-сертификатов через 48 часов",
+              type: "warning",
+            },
+            {
+              msg: "💾 Создание снапшота БД на alpha-core-01",
+              type: "success",
+            },
+            {
+              msg: "🌐 Обнаружена новая сетевая политика, применение...",
+              type: "info",
+            },
+            {
+              msg: "🔁 Перезагрузка сервиса мониторинга на monitor-graf",
+              type: "warning",
+            },
+            {
+              msg: "📈 Сбор логов с cache-ny-mem02: запись 240 событий/сек",
+              type: "info",
+            },
+          ];
+          const randomEvent =
+            eventsPool[Math.floor(Math.random() * eventsPool.length)];
+          addToLog(randomEvent.msg, randomEvent.type);
+
+          if (Math.random() < 0.35 && hostsData.length > 0) {
+            const randomHost =
+              hostsData[Math.floor(Math.random() * hostsData.length)];
+            addToLog(
+              `📡 Скрипт опрашивает хост ${randomHost.name} (keepalive)`,
+              "info",
+            );
+          }
+        }, 5200);
+      }
+
+      // ------------------- ЗАПОЛНЕНИЕ СПИСКА ХОСТОВ -------------------
+      function renderHostsList() {
+        hostListContainer.innerHTML = "";
+        hostsData.forEach((host) => {
+          const hostDiv = document.createElement("div");
+          hostDiv.className =
+            "list-group-item list-group-item-action host-item d-flex align-items-center";
+          hostDiv.setAttribute("data-host", host.name);
+          hostDiv.innerHTML = `
+            <span class="me-2 fs-5">${host.icon}</span>
+            <span class="flex-grow-1 fw-semibold">${host.name}</span>
+            <span class="badge bg-secondary rounded-pill">${host.role}</span>
+            <span class="badge-host-status ms-2"></span>
+          `;
+          hostDiv.addEventListener("click", (e) => {
+            e.stopPropagation();
+            addToLog(
+              `🖱️ Выбран хост: ${host.name} — запуск профилирования`,
+              "info",
+            );
+            setTimeout(() => {
+              const cpuVal = Math.floor(Math.random() * 60) + 10;
+              addToLog(
+                `✅ [${host.name}] системные данные: CPU ${cpuVal}% | uptime 12d`,
+                "success",
+              );
+              addToLog(
+                `🔍 Дополнительная проверка: сервисы на ${host.name} работают стабильно`,
+                "info",
+              );
+              addTerminalLine(
+                `[система] Хост ${host.name} просканирован (CPU ${cpuVal}%)`,
+              );
+            }, 300);
+            hostDiv.style.transform = "scale(1.01)";
+            setTimeout(() => (hostDiv.style.transform = ""), 150);
+          });
+          hostListContainer.appendChild(hostDiv);
+        });
+        document.getElementById("hostCount").innerText = hostsData.length;
+      }
+
+      // ------------------- ИНИЦИАЛИЗАЦИЯ -------------------
+      renderHostsList();
+      startLiveLogGenerator();
+
+      clearLogBtn.addEventListener("click", clearLog);
+      clearTermBtn.addEventListener("click", clearTerminal);
+
+      termInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          const command = termInput.value;
+          if (command.trim() !== "") {
+            processCommand(command);
+          }
+          termInput.value = "";
+          termOutputDiv.scrollTop = termOutputDiv.scrollHeight;
+        }
+      });
+
+      document
+        .querySelector(".terminal-container")
+        .addEventListener("click", () => {
+          termInput.focus();
+        });
+
+      addToLog(
+        "🔥 Live-скрипт активирован: генерация событий каждые 5 секунд",
+        "success",
+      );
+      addToLog(
+        "💡 Кликните на любой хост слева — запустится сбор данных в реальном времени",
+        "info",
+      );
+      addToLog(
+        "⌨️ В терминале доступны команды: help, ping, exec, select, log и другие",
+        "info",
+      );
+
+      setTimeout(() => {
+        addToLog(
+          `🌐 Инициализирован периодический опрос ${hostsData.length} хостов (ICMP+HTTP)`,
+          "info",
+        );
+      }, 1800);
+
+      termInput.focus();
+    </script>
+  </body>
+</html>

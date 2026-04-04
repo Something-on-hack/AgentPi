@@ -497,6 +497,50 @@
         }
       }
       initSelectedLists();
+
+      // Найти кнопку запуска (она уже есть в HTML)
+      const runButton = document.getElementById("runButton");
+      if (runButton) {
+        runButton.addEventListener("click", () => {
+          const selectedAgents = [];
+          const selectedAgentsList =
+            document.getElementById("selectedAgentsList");
+          for (let i = 0; i < selectedAgentsList.options.length; i++) {
+            const opt = selectedAgentsList.options[i];
+            if (opt.disabled) continue;
+            selectedAgents.push({
+              id: opt.value,
+              name: opt.textContent,
+              ip: opt.dataset.ip || "",
+              key: opt.dataset.key || "",
+              comment: opt.dataset.comment || "",
+            });
+          }
+          if (selectedAgents.length === 0) {
+            alert("Нет выбранных агентов. Добавьте агентов в рабочий набор.");
+            return;
+          }
+          localStorage.setItem(
+            "selectedAgents",
+            JSON.stringify(selectedAgents),
+          );
+          window.open("varlogscmd.html", "_blank");
+        });
+      }
+
+      // Обработчик кнопки ЗАПУСК
+      runButton.addEventListener("click", () => {
+        const agents = getSelectedAgentsData();
+        if (agents.length === 0) {
+          alert(
+            "Нет выбранных агентов. Добавьте хотя бы одного агента в рабочий набор.",
+          );
+          return;
+        }
+        localStorage.setItem("selectedAgents", JSON.stringify(agents));
+        // Открыть страницу мониторинга в новой вкладке (или можно в текущей)
+        window.open("varlogscmd.html", "_blank");
+      });
     </script>
   </body>
 </html>
