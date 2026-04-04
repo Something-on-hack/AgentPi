@@ -39,7 +39,22 @@ class FleetSSHServer(paramiko.ServerInterface):
         return paramiko.AUTH_FAILED
 
     def check_channel_shell_request(self, channel):
+        print('Check channel shell')
         self.event.set()
+        return True
+
+    def check_pty_request(self, term, width, height, pixelwidth, pixelheight, modes):
+        # Разрешаем запрос на выделение псевдо-терминала
+        print('Check pty')
+        return True
+
+    def check_shell_request(self, channel):
+        print('Check shell')
+        self.event.set()
+        return True
+
+    def check_channel_pty_request(self, channel, term, width, height, pixelwidth, pixelheight, modes):
+        print("[+] PTY request accepted")
         return True
 
 
@@ -57,6 +72,7 @@ def load_admin_public_key(filepath):
 
 
 def start_node_server():
+
     # 1. Загружаем Host-ключ СЕРВЕРА (закрытый ключ узла)
     try:
         host_key = paramiko.RSAKey(filename=SERVER_HOST_KEY_FILE)
@@ -102,9 +118,11 @@ def handle_admin_connection(client_sock, host_key, allowed_admin_key):
     try:
         client_addr = client_sock.getpeername()
 
-        with paramiko.Transport(client_sock) as transport:  # Автоматически закроется
-            transport.add_server_key(host_key)
-            server_interface = FleetSSHServer(allowed_admin_key)
+        transport = paramiko.Transport(client_sock)
+        #transport.auth_timeout(180.0)
+        transport.add_server_key(host_key)
+        server_interface = FleetSSHServer(allowed_admin_key)
+        #server_interface.event.wait(30)
 
         try:
             transport.start_server(server=server_interface)
@@ -113,6 +131,7 @@ def handle_admin_connection(client_sock, host_key, allowed_admin_key):
             return
 
         channel = transport.accept(10)
+
         if channel is None:
             return
 
